@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CF 优选 IP 工具 - Web UI</title>
+<style>
+  :root {
+    --bg: #060a12;
+    --panel: #0d1420;
+    --panel2: #131d2f;
+    --border: #1d2c47;
+    --text: #dbe9ff;
+    --muted: #8096b8;
+    --accent: #27e6ef;
+    --accent2: #3d8bff;
+    --green: #36e6a6;
+    --red: #ff4d6d;
+    --yellow: #ffb423;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg);
+    background-image: url("{{ url_for('static', filename='bg.svg') }}");
+    background-size: cover;
+    background-position: center top;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 20px; }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 18px;
+  }
+  header h1 { font-size: 20px; font-weight: 600; }
+  header h1 .hl { color: var(--accent); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 999px; font-size: 13px;
+    border: 1px solid var(--border); background: var(--panel);
+  }
+  .badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .badge.running .dot { background: var(--green); animation: blink 1s infinite; }
+  .badge.finished .dot { background: var(--green); }
+  .badge.error .dot { background: var(--red); }
+  .badge.idle .dot { background: var(--muted); }
+  @keyframes blink { 50% { opacity: 0.2; } }
+  .layout {
+    display: grid; grid-template-columns: 380px 1fr; gap: 16px;
+  }
+  @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px; margin-bottom: 16px;
+  }
+  .panel h2 {
+    font-size: 15px; margin-bottom: 12px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel h2::before {
+    content: ""; width: 2px; height: 14px; border-radius: 1px;
+    background: var(--accent);
+  }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field.full { grid-column: 1 / -1; }
+  label { font-size: 12px; font-weight: 500; color: var(--muted); }
+  input[type=text], input[type=number], input[type=password], select, textarea {
+    background: var(--panel2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: 7px 10px;
+    font-size: 13px; outline: none; width: 100%;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 60px; font-family: Consolas, monospace; }
+  .hint { font-size: 11px; color: var(--muted); }
+  .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  button {
+    border: none; border-radius: 6px; padding: 9px 16px; font-size: 13px;
+    cursor: pointer; font-weight: 600; color: #fff;
+    background: var(--panel2); border: 1px solid var(--border);
+  }
+  button:hover { filter: brightness(1.2); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn-danger:focus-visible { outline-color: var(--red); }
+  .btn-ok:focus-visible { outline-color: var(--green); }
+  .btn-primary { background: var(--accent); border: none; color: #04141c; font-weight: 700; }
+  .btn-primary:focus-visible { outline-color: var(--accent2); }
+  .btn-danger { background: var(--red); border: none; }
+  .btn-ok { background: var(--green); border: none; color: #04130d; }
+  .console {
+    background: #05070d; border: 1px solid var(--border); border-radius: 6px;
+    height: 420px; overflow-y: auto; overflow-x: auto; padding: 10px 12px;
+    font-family: Consolas, "Courier New", monospace; font-size: 12px;
+    white-space: pre; line-height: 1.55;
+  }
+  .console .dim { color: var(--muted); }
+  .console .err { color: var(--red); }
+  .console .ok { color: var(--green); }
+  .console .warn { color: var(--yellow); }
+  #resultBox {
+    background: #05070d; border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; font-family: Consolas, monospace; font-size: 13px;
+    height: 240px; overflow-y: auto; overflow-x: auto; white-space: pre;
+    word-break: break-all; color: var(--green);
+  }
+  .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  #meta { font-size: 12px; font-family: Consolas, "Courier New", monospace; color: var(--muted); }
+  .modal-mask {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: none; align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal-mask.show { display: flex; }
+  .modal {
+    width: min(760px, 92vw); max-height: 80vh; overflow-y: auto;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px;
+  }
+  .modal h3 { margin-bottom: 10px; font-size: 15px; }
+  .modal pre {
+    white-space: pre-wrap; word-break: break-all; font-size: 12.5px;
+    font-family: Consolas, monospace; background: #05070d;
+    border-radius: 6px; padding: 12px; max-height: 50vh; overflow-y: auto;
+  }
+  .modal .btn-row { margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end; }
+  ::selection { background: rgba(39, 230, 239, 0.25); color: #f2fbff; }
+  .btn-reload {
+    grid-column: 1 / -1;
+    width: 100%;
+    padding: 8px 12px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.3px;
+  }
+  .btn-reload:hover { color: var(--text); border-color: var(--accent); }
+  .btn-reload.ok { color: var(--green); border-color: var(--green); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb {
+    background: #1a2c48;
+    border: 2px solid var(--bg);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border); }
+  * { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="hl">CF 优选 IP 工具</span> Web 控制台</h1>
+    <div>
+      <span class="badge idle" id="badge"><span class="dot"></span><span id="badgeText">空闲</span></span>
+      <span id="meta" style="margin-left:10px"></span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div>
+      <div class="panel">
+        <h2>测速设置</h2>
+        <div class="grid2">
+          <div class="field"><label>目标端口 (默认读自ps1)</label><input type="number" id="Port" value="443" min="1" max="65535"><span class="hint" id="PortHint"></span></div>
+          <div class="field"><label>名额 DN_COUNT</label><input type="number" id="DN_COUNT" value="10" min="1"></div>
+          <div class="field"><label>最低下载速度 MB/s</label><input type="number" id="MinSpeed" value="30" min="0"></div>
+          <div class="field"><label>延迟优先阈值 ms</label><input type="number" id="PreferredLatency" value="200" min="1"></div>
+          <div class="field"><label>延迟上限 ms</label><input type="number" id="DelayMaxLatency" value="300" min="1"></div>
+          <div class="field"><label>并发线程</label><input type="number" id="Threads" value="200" min="1"></div>
+          <div class="field"><label>单 IP 测速时长 s</label><input type="number" id="DownloadTestTime" value="10" min="1"></div>
+          <div class="field"><label>候选 IP 数 (0=全部)</label><input type="number" id="DownloadCandidateCount" value="0" min="0"></div>
+          <div class="field full">
+            <label>IP 来源模式</label>
+            <select id="IPSourceMode">
+              <option value="Default" selected>默认模式 - 测速内置 Cloudflare IP 段</option>
+              <option value="LocalSample">本地 IP 库模式 - 从指定 txt 随机抽样优选</option>
+            </select>
+          </div>
+          <div class="field full" id="fieldSampleIPFile" style="display:none"><label>IP 库文件路径 (纯 IP 文本，每行一个，默认 cf_ips.txt)</label><input type="text" id="SampleIPFile" value="cf_ips.txt" placeholder="例如: cf_ips.txt 或绝对路径 D:\lists\my_ips.txt"><span class="hint">仅从该文件测速；相对路径基于工具目录</span></div>
+          <div class="field full" id="fieldSampleCount" style="display:none"><label>蒙特卡洛抽样数量 (0=用整个IP库)</label><input type="number" id="SampleCount" value="0" min="0"><span class="hint">每次开始测速都会重新随机抽取，多次运行可覆盖更多样本</span></div>
+          <div class="field full">
+            <label>测速模式</label>
+            <select id="DownloadTestMode">
+              <option value="LatencyTop" selected>LatencyTop - 按延迟优先，达名额即停</option>
+              <option value="Full">Full - 测完所有候选</option>
+            </select>
+          </div>
+          <div class="field full"><label>优先区域 (逗号分隔)</label><input type="text" id="CFCOLO" value="HKG,SIN,NRT,ICN,TPE"></div>
+          <div class="field full"><label>自定义后缀</label><input type="text" id="CustomSuffix" value="❤️CF"></div>
+          <div class="field full">
+            <label>自定义测速源 (默认读自ps1，每行一个 URL，可增删；运行时自动探测优选最快源)</label>
+            <textarea id="SpeedSourceUrls" placeholder="测速源将在加载后自动填入…"></textarea>
+          </div>
+          <button id="btnReloadPs1" class="btn-reload">↺ 从 SelectIP-port.ps1 恢复默认端口与测速源</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>GitHub 同步 (可选)</h2>
+        <div class="grid2">
+          <div class="field full">
+            <label>GitHub Token (留空则不上传)</label>
+            <input type="password" id="GitHubToken" placeholder="ghp_..." autocomplete="off">
+          </div>
+          <div class="field full"><label>仓库 (owner/repo)</label><input type="text" id="GitHubRepo" value="xiagefei/CFBestIP"></div>
+          <div class="field"><label>目标文件路径</label><input type="text" id="GitHubPath" value="addressesapi.txt"></div>
+          <div class="field"><label>分支</label><input type="text" id="GitHubBranch" value="main"></div>
+        </div>
+        <p class="hint" style="margin-top:8px">Token 仅用于本次任务上传到上面指定的仓库，保存在本机配置文件中，请勿使用已公开泄露的 Token。</p>
+      </div>
+
+      <div class="panel">
+        <div class="buttons">
+          <button class="btn-primary" id="btnStart">▶ 开始测速</button>
+          <button class="btn-danger" id="btnStop" disabled>■ 停止</button>
+          <button id="btnDryRun">校验配置</button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="toolbar">
+          <h2 style="margin:0">运行日志</h2>
+          <button id="btnClearLog" style="margin-left:auto; padding:5px 10px">清空</button>
+        </div>
+        <div class="console" id="console"></div>
+      </div>
+
+      <div class="panel">
+        <div class="toolbar">
+          <h2 style="margin:0">优选结果</h2>
+          <button id="btnCopy" style="margin-left:auto; padding:5px 10px">复制</button>
+          <button id="btnDownload" style="padding:5px 10px">下载 txt</button>
+          <button id="btnRefreshResult" style="padding:5px 10px">刷新</button>
+        </div>
+        <div id="resultBox"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-mask" id="modalMask">
+  <div class="modal">
+    <h3 id="modalTitle">配置校验结果</h3>
+    <pre id="modalBody"></pre>
+    <div class="btn-row"><button id="modalClose">关闭</button></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const consoleEl = $('console');
+let state = 'idle';
+let pending = '';          // 未以 \n 结束的原始文本（可能包含 CF 进度条连续输出）
+let activeLine = null;     // 当前"进度行"元素，更新时只重写它
+let progPrefixDone = false; // 当前进度流的行首前缀（如"正在执行程序..."）是否已输出
+
+const PROG_RE = /\d+\s*\/\s*\d+\s*\[[^\]]*\](?:\s*可用:\s*\d+)?/g;
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderLineEl(text, dim) {
+  const div = document.createElement('div');
+  const esc = escapeHtml(text);
+  if (dim) {
+    div.className = 'dim';
+    div.textContent = text;
+    return div;
+  }
+  div.innerHTML = esc
+    .replace(/(?:^|\n)(✅|✔)/g, '<span class="ok">$1</span>')
+    .replace(/(?:^|\n)(❌|✖)/g, '<span class="err">$1</span>')
+    .replace(/(?:^|\n)警告/g, '<span class="warn">警告</span>')
+    .replace(/(\[[1-6]\/6\])/g, '<span class="dim">$1</span>');
+  return div;
+}
+
+function lastSeg(raw) {
+  const segs = raw.split('\r').filter(s => s !== '');
+  return segs.length ? segs[segs.length - 1] : '';
+}
+
+function isProgressLine(t) {
+  return /^\s*\d+\s*\/\s*\d+/.test(t) || /^\s*可用:\s*\d+$/.test(t);
+}
+
+function findProg(text) {
+  PROG_RE.lastIndex = 0;
+  let m, first = null, last = null;
+  while ((m = PROG_RE.exec(text)) !== null) {
+    if (!first) first = m;
+    last = m;
+  }
+  return { first, last };
+}
+
+function collapseProg(text) {
+  const { last } = findProg(text);
+  return last ? last[0] : text;
+}
+
+function scrollLog() {
+  if (consoleEl.scrollHeight - consoleEl.scrollTop - consoleEl.clientHeight < 60) {
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+}
+
+function feedLog(text) {
+  if (!text) return;
+  pending += text;
+  if (pending.length > 4000) pending = pending.slice(-4000);
+  while (true) {
+    const i = pending.indexOf('\n');
+    if (i === -1) break;
+    const raw = pending.slice(0, i);
+    pending = pending.slice(i + 1);
+    progPrefixDone = false;
+    const t = collapseProg(lastSeg(raw));
+    if (t === '') continue;
+    consoleEl.appendChild(renderLineEl(t, isProgressLine(t)));
+  }
+  const { first, last } = findProg(pending);
+  if (last) {
+    if (first && !progPrefixDone) {
+      const prefix = pending.slice(0, first.index).trim();
+      if (prefix) consoleEl.appendChild(renderLineEl(prefix, isProgressLine(prefix)));
+      progPrefixDone = true;
+    }
+    if (!activeLine) {
+      activeLine = document.createElement('div');
+      activeLine.className = 'dim';
+      consoleEl.appendChild(activeLine);
+    }
+    activeLine.textContent = last[0];
+  } else if (pending.trim() !== '') {
+    const t = lastSeg(pending);
+    if (!activeLine) {
+      activeLine = document.createElement('div');
+      activeLine.className = 'dim';
+      consoleEl.appendChild(activeLine);
+    }
+    activeLine.textContent = t;
+  } else if (activeLine) {
+    activeLine.remove();
+    activeLine = null;
+  }
+  scrollLog();
+}
+
+function clearLog() {
+  consoleEl.innerHTML = '';
+  pending = '';
+  activeLine = null;
+  progPrefixDone = false;
+}
+
+function collectConfig() {
+  const cfg = {
+    Port: parseInt($('Port').value) || 443,
+    DN_COUNT: parseInt($('DN_COUNT').value) || 10,
+    MinSpeed: parseFloat($('MinSpeed').value) || 0,
+    PreferredLatency: parseInt($('PreferredLatency').value) || 200,
+    DelayMaxLatency: parseInt($('DelayMaxLatency').value) || 300,
+    Threads: parseInt($('Threads').value) || 200,
+    DownloadTestTime: parseInt($('DownloadTestTime').value) || 10,
+    DownloadCandidateCount: parseInt($('DownloadCandidateCount').value) || 0,
+    IPSourceMode: $('IPSourceMode').value,
+    SampleIPFile: $('IPSourceMode').value === 'LocalSample' ? $('SampleIPFile').value.trim() : '',
+    SampleCount: $('IPSourceMode').value === 'LocalSample' ? (parseInt($('SampleCount').value) || 0) : 0,
+    DownloadTestMode: $('DownloadTestMode').value,
+    CFCOLO: $('CFCOLO').value.trim(),
+    CustomSuffix: $('CustomSuffix').value.trim(),
+    GitHubToken: $('GitHubToken').value.trim(),
+    GitHubRepo: $('GitHubRepo').value.trim(),
+    GitHubPath: $('GitHubPath').value.trim(),
+    GitHubBranch: $('GitHubBranch').value.trim(),
+  };
+  const urls = $('SpeedSourceUrls').value.split('\n')
+    .map(s => s.trim()).filter(s => s.length > 0);
+  if (urls.length > 0) cfg.SpeedSourceUrls = urls;
+  return cfg;
+}
+
+function setState(s) {
+  state = s;
+  const badge = $('badge');
+  badge.className = 'badge ' + s;
+  $('badgeText').textContent = s === 'idle' ? '空闲'
+    : s === 'running' ? '测速中'
+    : (s === 'finished' ? '已完成' : s);
+  $('btnStart').disabled = (s === 'running');
+  $('btnStop').disabled = (s !== 'running');
+  $('btnDryRun').disabled = (s === 'running');
+}
+
+function setMeta(text) { $('meta').textContent = text || ''; }
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+function fmtTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts * 1000);
+  return d.toLocaleTimeString();
+}
+
+async function poll() {
+  const data = await api('/api/status');
+  feedLog(data.log || '');
+  if (data.state !== state) {
+    setState(data.state);
+    if (data.state === 'running') {
+      setMeta('PID ' + data.pid + ' · 开始 ' + fmtTime(data.started_at));
+      feedLog('\n===== 新任务已启动 =====\n');
+    } else if (data.state === 'finished') {
+      const code = data.exit_code === 0 ? '成功' : ('失败 (退出码 ' + data.exit_code + ')');
+      setMeta('结束 ' + fmtTime(data.ended_at) + ' · ' + code);
+      feedLog('\n===== 任务结束: ' + code + ' =====\n');
+      loadResult();
+    }
+  }
+}
+
+$('btnStart').onclick = async () => {
+  feedLog('\n正在提交任务...\n');
+  const res = await api('/api/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(collectConfig()),
+  });
+  if (res.ok) {
+    setState('running');
+    setMeta('PID ' + res.pid);
+  } else {
+    feedLog('❌ 启动失败: ' + (res.error || '未知错误') + '\n');
+  }
+};
+
+$('btnStop').onclick = async () => {
+  await api('/api/stop', { method: 'POST' });
+  feedLog('\n已发送停止指令，正在终止任务...\n');
+};
+
+$('btnDryRun').onclick = async () => {
+  $('modalTitle').textContent = '配置校验 (DryRun)';
+  $('modalBody').textContent = '正在校验配置...';
+  $('modalMask').classList.add('show');
+  try {
+    const res = await api('/api/dryrun', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(collectConfig()),
+    });
+    $('modalBody').textContent = res.output || (res.ok ? '配置校验通过' : '配置校验失败');
+  } catch (e) {
+    $('modalBody').textContent = '请求失败: ' + e.message;
+  }
+};
+$('modalClose').onclick = () => $('modalMask').classList.remove('show');
+
+async function loadResult() {
+  const res = await api('/api/result');
+  $('resultBox').textContent = res.ok ? res.content : res.error;
+}
+$('btnRefreshResult').onclick = loadResult;
+
+$('btnCopy').onclick = async () => {
+  const text = $('resultBox').textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+    $('btnCopy').textContent = '已复制 ✓';
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); ta.remove();
+    $('btnCopy').textContent = '已复制 ✓';
+  }
+  setTimeout(() => $('btnCopy').textContent = '复制', 1500);
+};
+
+$('btnDownload').onclick = () => window.location.href = '/api/result/download';
+$('btnClearLog').onclick = () => { clearLog(); };
+
+function toggleSampleFields() {
+  const on = $('IPSourceMode').value === 'LocalSample';
+  $('fieldSampleIPFile').style.display = on ? '' : 'none';
+  $('fieldSampleCount').style.display = on ? '' : 'none';
+}
+$('IPSourceMode').onchange = toggleSampleFields;
+toggleSampleFields();
+
+async function loadPs1Defaults() {
+  try {
+    const r = await api('/api/ps1-defaults');
+    $('Port').value = r.port;
+    $('PortHint').textContent = r.parse_error ? ('解析失败: ' + r.parse_error)
+      : ('来自 ps1: 常用 443/8443/2053/2083/2087/2096');
+    $('SpeedSourceUrls').value = r.sources.map(s => s.url).join('\n');
+    return r;
+  } catch (e) {
+    $('PortHint').textContent = '读取 ps1 默认值失败: ' + e.message;
+    return null;
+  }
+}
+$('btnReloadPs1').onclick = () => {
+  loadPs1Defaults().then(r => {
+    if (r) {
+      feedLog('\n已从 SelectIP-port.ps1 载入默认端口与测速源 (' + r.sources.length + ' 个)\n');
+      const btn = $('btnReloadPs1');
+      const old = btn.textContent;
+      btn.textContent = '✓ 已恢复默认端口与测速源';
+      btn.classList.add('ok');
+      setTimeout(() => { btn.textContent = old; btn.classList.remove('ok'); }, 1500);
+    }
+  });
+};
+
+setState('idle');
+loadResult();
+loadPs1Defaults();
+setInterval(poll, 1500);
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "Port": 2096,
+  "DN_COUNT": 10,
+  "MinSpeed": 30,
+  "PreferredLatency": 150,
+  "DelayMaxLatency": 200,
+  "Threads": 200,
+  "DownloadTestTime": 10,
+  "DownloadCandidateCount": 0,
+  "IPSourceMode": "LocalSample",
+  "SampleIPFile": "cf_ips.txt",
+  "SampleCount": 2000,
+  "DownloadTestMode": "LatencyTop",
+  "CFCOLO": "HKG,SIN,NRT,ICN,TPE",
+  "CustomSuffix": "❤️CF",
+  "GitHubToken": "",
+  "GitHubRepo": "xiagefei/CFBestIP",
+  "GitHubPath": "addressesapi.txt",
+  "GitHubBranch": "main",
+  "SpeedSourceUrls": [
+    "https://speed.cloudflare.com/__down?bytes=99999999",
+    "https://speed.5ai.kdns.fr/200M",
+    "https://cf.090227.xyz/__down?bytes=99999999"
+  ]
+}

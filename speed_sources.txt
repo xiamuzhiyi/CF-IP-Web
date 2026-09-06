@@ -1,0 +1,3 @@
+https://speed.cloudflare.com/__down?bytes=99999999
+https://speed.5ai.kdns.fr/200M
+https://cf.090227.xyz/__down?bytes=99999999
